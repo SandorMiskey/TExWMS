@@ -4,7 +4,7 @@ proto/
 scripts/.env.sh
 scripts/worksheet.sh
 scripts/proto.sh
-templates/{WMS_STACK1_NAME}/dcoker.tgz
+templates/{WMS_STACK1_NAME}/docker.tgz
 workbench
 wbench
 
