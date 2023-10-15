@@ -4,9 +4,9 @@ proto/
 scripts/.env.sh
 scripts/worksheet.sh
 scripts/proto.sh
+templates/{WMS_STACK1_NAME}/dcoker.tgz
 workbench
 wbench
-templates/registry.tgz
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,vim,web,macos,linux,visualstudiocode,node
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,vim,web,macos,linux,visualstudiocode,node

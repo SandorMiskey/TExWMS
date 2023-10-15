@@ -1,0 +1,28 @@
+version: "3.3"
+
+networks:
+  ${WMS_DOCKER_NET}:
+    external: true
+    # name: ${WMS_DOCKER_NET}
+
+services:
+  ${WMS_STACK1_NAME}:
+    environment:
+      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=${WMS_STACK1_DATA}
+      - REGISTRY_HTTP_ADDR=0.0.0.0:${WMS_STACK1_PORT}
+      - REGISTRY_HTTP_TLS_CERTIFICATE=${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt
+      - REGISTRY_HTTP_TLS_KEY=${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.key
+    hostname: ${WMS_STACK1_FQDN}
+    image: registry:2
+    labels:
+      service: ${WMS_STACK1_FQDN}
+      # registry: true
+    networks:
+      ${WMS_DOCKER_NET}:
+        aliases:
+          - ${WMS_STACK1_NAME}
+          - ${WMS_STACK1_FQDN}
+    ports:
+      - ${WMS_STACK1_PORT}:${WMS_STACK1_PORT}
+    volumes:
+      - ${WMS_STACK1_DATA}:${WMS_STACK1_DATA}

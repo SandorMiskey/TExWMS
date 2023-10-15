@@ -6,20 +6,17 @@
 
 # region: load config
 
-[[ ${PATH_RC:-"unset"} == "unset" ]] && PATH_RC=${PATH_BASE}/scripts/commonFuncs.sh
-if [ ! -f  $PATH_RC ]; then
-	echo "=> PATH_RC ($PATH_RC) not found, make sure proper path is set or you execute this from the repo's 'scrips' directory!"
+[[ ${WMS_PATH_RC:-"unset"} == "unset" ]] && WMS_PATH_RC=${WMS_PATH_BASE}/scripts/common.sh
+if [ ! -f  $WMS_PATH_RC ]; then
+	echo "=> WMS_PATH_RC ($WMS_PATH_RC) not found, make sure proper path is set or you execute this from the repo's 'scrips' directory!"
 	exit 1
 fi
-source $PATH_RC
+source $WMS_PATH_RC
 
-# commonPrintfBold "note that certain environment variables must be set to work properly!"
-# commonContinue "have you reloded ${PATH_BASE}/.env?"
-
-if [[ ${PATH_SCRIPTS:-"unset"} == "unset" ]]; then
-	commonVerify 1 "PATH_SCRIPTS is unset"
+if [[ ${WMS_PATH_SCRIPTS:-"unset"} == "unset" ]]; then
+	commonVerify 1 "WMS_PATH_SCRIPTS is unset"
 fi
-commonPP $PATH_SCRIPTS
+commonPP $WMS_PATH_SCRIPTS
 
 # endregion: config
 # region: strartup warning
@@ -28,9 +25,9 @@ commonPrintfBold " "
 commonPrintfBold "THIS SCRIPT CAN BE DESTRUCTIVE, IT SHOULD BE RUN WITH SPECIAL CARE ON THE MAIN MANAGER NODE"
 commonPrintfBold " "
 force=$COMMON_FORCE
-COMMON_FORCE=$EXEC_SURE
+COMMON_FORCE=$WMS_EXEC_SURE
 commonContinue "do you want to continue?"
-COMMON_FORCE=$force
+export COMMON_FORCE=$force
 unset force
 
 # endregion: warning
@@ -47,25 +44,50 @@ unset force
 # 		commonVerify 1  "versions do not match required"
 # 	fi 
 # }
-
-commonYN "search for dependencies?" commonDeps ${COMMON_PREREQS[@]}
 # commonYN "validate ca binary versions?" _CAVersions
+commonYN "search for dependencies?" commonDeps ${COMMON_PREREQS[@]}
 
 # endregion: dependencies and versions
+# region: docker reset
+
+function _genNetwork() {
+		local out
+
+		commonPrintf " "
+		commonPrintf "reseting docker"
+		commonPrintf " "
+
+		# halt services
+		out=$( docker-compose -f ${WMS_DOCKER_STACKS}/* -p $WMS_DOCKER_NET down 2>&1 )
+		commonVerify $? "failed to stop services: $out" "halt done"
+
+		# rm network
+		if [ "$(docker network ls --format "{{.Name}}" --filter "name=${WMS_DOCKER_NET}" | grep -w ${WMS_DOCKER_NET})" ]; then
+			out=$( docker network rm $WMS_DOCKER_NET 2>&1 )
+			commonVerify $? "failed to 'docker network rm' ${WMS_DOCKER_NET}: $out" "network rm done"
+		fi
+
+		# create network
+		out=$( docker network create $WMS_DOCKER_INIT 2>&1 )
+		commonVerify $? "failed to create network: $out" "$WMS_DOCKER_NET network is up"
+}
+[[ "$WMS_EXEC_DRY" == false ]] && commonYN "reset docker, create network ${WMS_DOCKER_NET}?" _genNetwork
+
+# endregion: docker reset
 # region: remove config and persistent data
 
-_WipePersistent() {
+_genWipePersistent() {
 
 	_wipe() {
-		# making sure all docker services are stopped
-		# docker service ls --format '{{.ID}}' | xargs -I {} docker service rm {}
-
 		# purge or create workbench
-		if [ -d "$PATH_WORKBENCH" ]; then
-			commonPrintf "$PATH_WORKBENCH exists"
-			commonPrintf "removing ${PATH_WORKBENCH}/*"
-			# err=$( sudo rm -rf "${PATH_WORKBENCH}/*" )
-			err=$( sudo find "$PATH_WORKBENCH" -mindepth 1 -delete )
+		if [ -z "$WMS_PATH_WORKBENCH" ]; then
+			commonVerify 1 "\$WMS_PATH_WORKBENCH should not be empty"
+		fi
+		if [ -d "$WMS_PATH_WORKBENCH" ]; then
+			commonPrintf "$WMS_PATH_WORKBENCH exists"
+			commonPrintf "removing ${WMS_PATH_WORKBENCH}/*"
+			# err=$( sudo rm -rf "${WMS_PATH_WORKBENCH}/*" )
+			err=$( sudo find "$WMS_PATH_WORKBENCH" -mindepth 1 -delete )
 			commonVerify $? $err
 		else
 			commonPrintf "$PATH_WORKBENCH doesn't exists"
@@ -77,23 +99,25 @@ _WipePersistent() {
 		# reset
 		commonPrintf "chgrp and chmod g+rwx"
 		local grp=$( id -g )
-		err=$( sudo chgrp $grp "$PATH_WORKBENCH" )
+		err=$( sudo chgrp $grp "$WMS_PATH_WORKBENCH" )
 		commonVerify $? $err
-		err=$( sudo chmod g+rwx "$PATH_WORKBENCH" )
+		err=$( sudo chmod g+rwx "$WMS_PATH_WORKBENCH" )
 		commonVerify $? $err
 
 		# remove localworkbench -> workbench symlink
-		local localworkbench=$(realpath "$PATH_LOCALWORKBENCH")
-		local workbench=$(realpath "$PATH_WORKBENCH")
+		local localworkbench=$(realpath "$WMS_PATH_LOCALWORKBENCH")
+		local workbench=$(realpath "$WMS_PATH_WORKBENCH")
 		if [ "$localworkbench" = "$workbench" ]; then
-			commonPrintf "\$PATH_LOCALWORKBENCH and \$PATH_WORKBENCH variables point to the same directory, it is not necessary to deal with any symlink"
+			commonPrintf "\$WMS_PATH_LOCALWORKBENCH points to the proper \$WMS_PATH_WORKBENCH, it is not necessary to deal with any symlink"
 		else
-			commonPrintf "removing $PATH_LOCALWORKBENCH symlink to $PATH_WORKBENCH"
-			err=$( sudo rm -f "$PATH_LOCALWORKBENCH" )
-			commonVerify $? $err
-			commonPrintf "symlink $PATH_LOCALWORKBENCH -> $PATH_WORKBENCH"
-			err=$( ln -s "$PATH_WORKBENCH" "$PATH_LOCALWORKBENCH" )
-			commonVerify $? $err
+			if [ ! -z $WMS_PATH_LOCALWORKBENCH ]; then
+				commonPrintf "removing $WMS_PATH_LOCALWORKBENCH symlink to $WMS_PATH_WORKBENCH"
+				err=$( sudo rm -f "$WMS_PATH_LOCALWORKBENCH" )
+				commonVerify $? $err
+				commonPrintf "symlink $WMS_PATH_LOCALWORKBENCH -> $WMS_PATH_WORKBENCH"
+				err=$( ln -s "$WMS_PATH_WORKBENCH" "$WMS_PATH_LOCALWORKBENCH" )
+				commonVerify $? $err
+			fi
 		fi
 
 		unset err
@@ -108,21 +132,21 @@ _WipePersistent() {
 	export COMMON_FORCE=$force
 }
 
-[[ "$EXEC_DRY" == false ]] && commonYN "wipe persistent data?" _WipePersistent
+[[ "$WMS_EXEC_DRY" == false ]] && commonYN "wipe persistent data?" _genWipePersistent
 
 # endregion: remove config and persistent data
 # region: process templates
 
-_templates() {
+function _genTemplates() {
 	commonPrintf " "
 	commonPrintf "processing templates:"
 	commonPrintf " "
-	for template in $( find $PATH_TEMPLATES/* ! -name '.*' -print ); do
+	for template in $( find $WMS_PATH_TEMPLATES/* ! -name '.*' -print ); do
 		target=$( commonSetvar $template )
-		target=$( echo $target | sed s+$PATH_TEMPLATES+$PATH_WORKBENCH+ )
+		target=$( echo $target | sed s+$WMS_PATH_TEMPLATES+$WMS_PATH_WORKBENCH+ )
 
-		local templateRel=$( echo "$template" | sed s+${PATH_BASE}/++g )
-		local targetRel=$( echo "$target" | sed s+${PATH_BASE}/++g | sed s+_nope$++g )
+		local templateRel=$( echo "$template" | sed s+${WMS_PATH_BASE}/++g )
+		local targetRel=$( echo "$target" | sed s+${WMS_PATH_BASE}/++g | sed s+_nope$++g )
 		if [[ -d $template ]]; then
 			commonPrintf "mkdir: $templateRel -> $targetRel"
 			err=$( mkdir -p "$target" )
@@ -156,25 +180,60 @@ _templates() {
 	unset target
 }
 
-[[ "$EXEC_DRY" == false ]] && commonYN "process templates?" _templates 
+[[ "$WMS_EXEC_DRY" == false ]] && commonYN "process templates?" _genTemplates 
 
 # endregion: process templates
-# region: bootstrap
+# region: registry
 
-	# _bootstrapCommon2() {
-	# 	commonPrintf "bootstrapping >>>${TC_COMMON2_STACK}<<<"
-	# 	${TC_PATH_SCRIPTS}/tcBootstrap.sh -m up -s ${TC_COMMON2_STACK}
-	# 	commonVerify $? "failed!"
-	# }
-	# commonYN "bootstrap ${TC_COMMON2_STACK}?" _bootstrapCommon2
+function _genRegistry() {
 
-# endregion: bootstrap
+	_inner() {
+		commonPrintf " "
+		commonPrintf "setting tls cert and key for docker registry"
+		commonPrintf " "
+
+		out=$( openssl req \
+			-newkey rsa:4096 -nodes -sha256 -keyout ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.key \
+			-addext "subjectAltName = DNS:${WMS_STACK1_NAME}" \
+			-x509 -days 36500 -out ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt \
+			-batch )
+		commonVerify $? "failed: $out"
+		unset out
+	}
+	commonYN "gen tls cert for docker registry?" _inner
+
+	_inner() {
+		local dir="/etc/docker/certs.d/${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}"
+		out=$( sudo mkdir -p "$dir" 2>&1 )
+		commonVerify $? "failed: $out"
+		out=$( sudo cp ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt "$dir/ca.crt" 2>&1 )
+		commonVerify $? "failed: $out" "${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt -> ${dir}/ca.crt in place"
+		unset out
+	}
+	commonYN "copy tls cert for registry?" _inner
+
+	_inner() {
+		commonPrintf " "
+		commonPrintf "bootstrapping >>>${WMS_STACK1_NAME}<<<"
+		commonPrintf " "
+		out=$( docker-compose -f $WMS_STACK1_CFG -p $WMS_DOCKER_NET up -d 2>&1 )
+		commonVerify $? "failed: $out" "${WMS_STACK1_NAME} is up"
+		unset out
+	}
+	commonYN "bootstrap ${WMS_STACK1_NAME}?" _inner
+
+	commonSleep $WMS_DOCKER_DELAY "waiting ${WMS_DOCKER_DELAY}s for the startup to finish"
+	unset _inner
+}
+[[ "$WMS_EXEC_DRY" == false ]] && commonYN "bootstrap ${WMS_STACK1_NAME}?" _genRegistry
+
+# endregion: registry
 # region: closing provisions
 
 _prefix="$COMMON_PREFIX"
 COMMON_PREFIX="===>>> "
 commonPrintfBold " "
-commonPrintfBold "ALL DONE! IF THIS IS FINAL, ISSUE THE FOLLOWING COMMAND: sudo chmod a-x ${PATH_SCRIPTS}/genesis.sh"
+commonPrintfBold "ALL DONE! IF THIS IS FINAL, ISSUE THE FOLLOWING COMMAND: sudo chmod a-x ${WMS_PATH_SCRIPTS}/genesis.sh"
 commonPrintfBold " "
 COMMON_PREFIX="_prefix"
 unset _prefix

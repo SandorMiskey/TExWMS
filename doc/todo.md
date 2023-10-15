@@ -4,12 +4,8 @@
 
 * .env
   * db root password
-  * conf.sh
-  * common.sh
-* bootstrap.sh
-  * common
-  * templates -> workbench
-* MariaDB 10.2.0
+* MariaDB
+  * 10.11.5
   * config
   * persistent data
 * Maxwell

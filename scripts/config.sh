@@ -12,53 +12,83 @@
 # region: base paths
 
 # get them from .env 
-export PATH_BASE=$PATH_BASE
-export PATH_RC=$PATH_RC
+export WMS_PATH_BASE=$WMS_PATH_BASE
+export WMS_PATH_RC=$WMS_PATH_RC
 
 # dirs under base
-export PATH_BIN=${PATH_BASE}/bin
-export PATH_SCRIPTS=${PATH_BASE}/scripts
-export PATH_TEMPLATES=${PATH_BASE}/templates
-export PATH_LOCALWORKBENCH=${PATH_BASE}/workbench
+export WMS_PATH_BIN=${WMS_PATH_BASE}/bin
+export WMS_PATH_SCRIPTS=${WMS_PATH_BASE}/scripts
+export WMS_PATH_TEMPLATES=${WMS_PATH_BASE}/templates
+export WMS_PATH_LOCALWORKBENCH=${WMS_PATH_BASE}/workbench
 
 # wms independent common functions
-export PATH_COMMON=${PATH_SCRIPTS}/common.sh
+export WMS_PATH_COMMON=${WMS_PATH_SCRIPTS}/common.sh
 
 # add scripts and bins to PATH
-export PATH=${PATH_BIN}:${PATH_SCRIPTS}:$PATH
+export PATH=${WMS_PATH_BIN}:${WMS_PATH_SCRIPTS}:$PATH
 
 # dirs under workbench
-export PATH_WORKBENCH=/srv/TExWMS
-export PATH_REGISTRY=${PATH_WORKBENCH}/registry
-export PATH_DB=${PATH_WORKBENCH}/db
-export PATH_STACK=${PATH_WORKBENCH}/docker-compose.yaml
+export WMS_PATH_WORKBENCH=/srv/TExWMS
+export WMS_PATH_REGISTRY=${WMS_PATH_WORKBENCH}/registry
+export WMS_PATH_DB=${WMS_PATH_WORKBENCH}/db
+export WMS_PATH_STACKS=${WMS_PATH_WORKBENCH}/stacks
 
 # endregion: base paths
 # region: exec control
 
-export EXEC_DRY=false
-export EXEC_FORCE=false
-export EXEC_SURE=false
-export EXEC_PANIC=true
-export EXEC_SILENT=false
-export EXEC_VERBOSE=true
+export WMS_EXEC_DRY=false
+export WMS_EXEC_FORCE=false
+export WMS_EXEC_SURE=false
+export WMS_EXEC_PANIC=true
+export WMS_EXEC_SILENT=false
+export WMS_EXEC_VERBOSE=true
 
 # endregion: exec contorl
 # region: versions and deps
 
-# export TC_DEPS_CA=1.5.6
-# export TC_DEPS_FABRIC=2.5.4
-# export TC_DEPS_COUCHDB=3.3.1
-# export TC_DEPS_BINS=('awk' 'bash' 'curl' 'git' 'go' 'jq' 'configtxgen' 'yq')
+export WMS_DEPS_BINS=('bash' 'docker' 'docker-compose')
+
+export WMS_DEPS_DB=mariadb:10.11.5
+export WMS_DEPS_ADMINER=adminer:4.8.1
+export WMS_DEPS_CDC=zendesk/maxwell:v1.40.5
 
 # endregion: versions and deps
 # region: docker
 
-# network maybe
-export DOCKER_STACK=$PATH_STACK
-export DOCKER_DELAY=10
-export DOCKER_REGISTRY_PORT=6000
-export DOCKER_REGISTRY_HOST=localhost
+export WMS_DOCKER_DELAY=5
+export WMS_DOCKER_NET=wms
+export WMS_DOCKER_INIT="--attachable --driver bridge --subnet 10.96.0.0/24 $WMS_DOCKER_NET"
+export WMS_DOCKER_DOMAIN=test.te-food.com
+export WMS_DOCKER_REGISTRY_PORT=6000
+export WMS_DOCKER_REGISTRY_HOST=localhost
+export WMS_DOCKER_STACKS=$WMS_PATH_STACKS
+
+# endregion: docker
+# region: stacks
+
+# region: registry 
+
+export WMS_STACK1_NAME=registry
+export WMS_STACK1_IMG=registry:2
+export WMS_STACK1_CFG=${WMS_DOCKER_STACKS}/00_${WMS_STACK1_NAME}.yaml
+export WMS_STACK1_FQDN=${WMS_STACK1_NAME}.${WMS_DOCKER_DOMAIN}
+export WMS_STACK1_PORT=$WMS_DOCKER_REGISTRY_PORT
+export WMS_STACK1_DATA=${WMS_PATH_WORKBENCH}/${WMS_STACK1_NAME}
+export WMS_STACK1_IMAGES=("$WMS_DEPS_DB" "$WMS_DEPS_ADMINER" "$WMS_DEPS_CDC")
+
+# endregion: registry
+# region: db
+
+export WMS_DOCKER_IMG_DB=${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}/${WMS_DEPS_DB}
+export WMS_DOCKER_IMG_ADMINER=${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}/${WMS_DEPS_ADMINER}
+
+# endregion: db
+# region: cdc
+
+export WMS_DOCKER_IMG_MAXWELL=${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}/${WMS_DEPS_MAXWELL}
+
+# endregion: cdc
+# region: ???
 
 # images
 # export TC_SWARM_IMG_COUCHDB=${TC_SWARM_MANAGER1[node]}:${TC_SWARM_IMG_PORT}/trustchain-couchdb
@@ -73,7 +103,9 @@ export DOCKER_REGISTRY_HOST=localhost
 # export TC_SWARM_IMG_PORTAINERAGENT=${TC_SWARM_MANAGER1[node]}:${TC_SWARM_IMG_PORT}/trustchain-portainer-agent
 # export TC_SWARM_IMG_PORTAINER=${TC_SWARM_MANAGER1[node]}:${TC_SWARM_IMG_PORT}/trustchain-portainer
 
-# endregion: swarm
+# endregion: ???
+
+# endregion: stacks
 # region: services: registry
 
 # export TC_COMMON1_STACK=infra
@@ -147,14 +179,14 @@ export DOCKER_REGISTRY_HOST=localhost
 # endregion: mgmt and metrics
 # region: common funcs
 
-[[ -f "$PATH_COMMON" ]] && source "$PATH_COMMON"
+[[ -f "$WMS_PATH_COMMON" ]] && source "$WMS_PATH_COMMON"
 [[ -f "$COMMON_FUNCS" ]] && source "$COMMON_FUNCS"
 
-export COMMON_FORCE=$EXEC_FORCE
-export COMMON_PANIC=$EXEC_PANIC
-export COMMON_PREREQS=("${DEPS_BINS[@]}")
-export COMMON_SILENT=$EXEC_SILENT
-export COMMON_VERBOSE=$EXEC_VERBOSE
+export COMMON_FORCE=$WMS_EXEC_FORCE
+export COMMON_PANIC=$WMS_EXEC_PANIC
+export COMMON_PREREQS=("${WMS_DEPS_BINS[@]}")
+export COMMON_SILENT=$WMS_EXEC_SILENT
+export COMMON_VERBOSE=$WMS_EXEC_VERBOSE
 
 # endregion: common funcs
 # region: load .env if any
