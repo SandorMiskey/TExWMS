@@ -1,0 +1,24 @@
+version: "3.3"
+
+networks:
+  ${WMS_DOCKER_NET}:
+    external: true
+    # name: ${WMS_DOCKER_NET}
+
+services:
+  ${WMS_STACK4_S1_NAME}:
+    command: bin/maxwell --config /app/config.properties
+    # environment:
+    hostname: ${WMS_STACK4_S1_FQDN}
+    image: ${WMS_STACK4_S1_IMG}
+    labels:
+      service: ${WMS_STACK4_S1_FQDN}
+    networks:
+      ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.6
+        aliases:
+          - ${WMS_STACK4_S1_NAME}
+          - ${WMS_STACK4_S1_FQDN}
+    restart: always
+    volumes:
+      - ${WMS_STACK4_S1_CONF}:/app/config.properties

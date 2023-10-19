@@ -2,15 +2,15 @@
 
 ## NOW
 
-* .env
-  * db root password
-* MariaDB
-  * 10.11.5
-  * config
-  * persistent data
-* Maxwell
-  * producer: stdout
-* RabbitMQ || Redis
+* cdc client
+  * action based on db & table
+    * default set
+    * actions
+      * api call
+      * external command
+      * function with parameters
+  * config channel to modify action set
+* config producer
 
 ## NEXT
 

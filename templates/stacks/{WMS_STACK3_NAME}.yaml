@@ -1,0 +1,29 @@
+version: "3.3"
+
+networks:
+  ${WMS_DOCKER_NET}:
+    external: true
+    # name: ${WMS_DOCKER_NET}
+
+services:
+  ${WMS_STACK3_S1_NAME}:
+    environment:
+      - RABBITMQ_DEFAULT_USER=$WMS_STACK3_S1_USER
+      - RABBITMQ_DEFAULT_PASS=$WMS_STACK3_S1_PW
+    hostname: ${WMS_STACK3_S1_FQDN}
+    image: ${WMS_STACK3_S1_IMG}
+    labels:
+      service: ${WMS_STACK3_S1_FQDN}
+    networks:
+      ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.5
+        aliases:
+          - ${WMS_STACK3_S1_NAME}
+          - ${WMS_STACK3_S1_FQDN}
+    ports:
+      - ${WMS_STACK3_S1_PORT_MQ}:5672
+      - ${WMS_STACK3_S1_PORT_MGMT}:15672
+    restart: always
+    volumes:
+      - ${WMS_STACK3_S1_CONF}:/etc/rabbitmq/
+      - ${WMS_STACK3_S1_DATA}:/var/lib/rabbitmq

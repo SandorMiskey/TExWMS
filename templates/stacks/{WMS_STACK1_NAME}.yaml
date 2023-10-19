@@ -4,6 +4,14 @@ networks:
   ${WMS_DOCKER_NET}:
     external: true
     # name: ${WMS_DOCKER_NET}
+# networks:
+#   ${WMS_DOCKER_NET}:
+#     driver: default
+#     ipam:
+#       driver: default
+#       config:
+#         - subnet: 10.96.0.0/24
+#           gateway: 10.96.0.1
 
 services:
   ${WMS_STACK1_NAME}:
@@ -19,6 +27,7 @@ services:
       # registry: true
     networks:
       ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.2
         aliases:
           - ${WMS_STACK1_NAME}
           - ${WMS_STACK1_FQDN}

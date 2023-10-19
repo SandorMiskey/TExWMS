@@ -19,47 +19,19 @@ fi
 commonPP $WMS_PATH_SCRIPTS
 
 # endregion: config
-# region: strartup warning
-
-commonPrintfBold " "
-commonPrintfBold "THIS SCRIPT CAN BE DESTRUCTIVE, IT SHOULD BE RUN WITH SPECIAL CARE ON THE MAIN MANAGER NODE"
-commonPrintfBold " "
-force=$COMMON_FORCE
-COMMON_FORCE=$WMS_EXEC_SURE
-commonContinue "do you want to continue?"
-export COMMON_FORCE=$force
-unset force
-
-# endregion: warning
-# region: check for dependencies and versions
-
-# _CAVersions() {
-# 	local required_version=$DEPS_CA
-# 	local actual_version=$( fabric-ca-client version | grep Version: | sed 's/.*Version: //' | sed 's/^v//i' )
-
-# 	commonPrintf "required ca version: $required_version"
-# 	commonPrintf "installed fabric-ca-client version: $actual_version"
-
-# 	if [ "$actual_version" != "$required_version" ]; then
-# 		commonVerify 1  "versions do not match required"
-# 	fi 
-# }
-# commonYN "validate ca binary versions?" _CAVersions
-commonYN "search for dependencies?" commonDeps ${COMMON_PREREQS[@]}
-
-# endregion: dependencies and versions
 # region: docker reset
 
 function _genNetwork() {
 		local out
-
-		commonPrintf " "
 		commonPrintf "reseting docker"
-		commonPrintf " "
 
 		# halt services
-		out=$( docker-compose -f ${WMS_DOCKER_STACKS}/* -p $WMS_DOCKER_NET down 2>&1 )
-		commonVerify $? "failed to stop services: $out" "halt done"
+		for cfg in ${WMS_DOCKER_STACKS}/*; do
+			out=$( gum spin --title "$cfg is going down" -- docker-compose -f $cfg -p $WMS_DOCKER_NET down )
+			# commonVerify $? "failed to stop services: $out" "$cfg halted"
+			commonPrintf "$cfg is down"
+		done
+		unset cfg
 
 		# rm network
 		if [ "$(docker network ls --format "{{.Name}}" --filter "name=${WMS_DOCKER_NET}" | grep -w ${WMS_DOCKER_NET})" ]; then
@@ -71,7 +43,6 @@ function _genNetwork() {
 		out=$( docker network create $WMS_DOCKER_INIT 2>&1 )
 		commonVerify $? "failed to create network: $out" "$WMS_DOCKER_NET network is up"
 }
-[[ "$WMS_EXEC_DRY" == false ]] && commonYN "reset docker, create network ${WMS_DOCKER_NET}?" _genNetwork
 
 # endregion: docker reset
 # region: remove config and persistent data
@@ -85,10 +56,9 @@ _genWipePersistent() {
 		fi
 		if [ -d "$WMS_PATH_WORKBENCH" ]; then
 			commonPrintf "$WMS_PATH_WORKBENCH exists"
-			commonPrintf "removing ${WMS_PATH_WORKBENCH}/*"
 			# err=$( sudo rm -rf "${WMS_PATH_WORKBENCH}/*" )
-			err=$( sudo find "$WMS_PATH_WORKBENCH" -mindepth 1 -delete )
-			commonVerify $? $err
+			err=$( gum spin --title "removing ${WMS_PATH_WORKBENCH}/*" -- sudo find "$WMS_PATH_WORKBENCH" -mindepth 1 -delete )
+			commonVerify $? "$err" "cleaned ${WMS_PATH_WORKBENCH}/*"
 		else
 			commonPrintf "$PATH_WORKBENCH doesn't exists"
 			commonPrintf "mkdir -p -v $PATH_WORKBENCH" 
@@ -123,24 +93,20 @@ _genWipePersistent() {
 		unset err
 	}
 
-	local force=$COMMON_FORCE
-	COMMON_FORCE=$EXEC_SURE
-	commonPrintfBold " "
-	commonPrintfBold "THIS WILL WIPE ALL PERSISTENT DATA OF YOURS..."
-	commonPrintfBold " "
-	commonYN "SURE?" _wipe
-	export COMMON_FORCE=$force
+	gum style 'THIS WILL WIPE ALL PERSISTENT DATA OF YOURS...'
+	if [ "$WMS_EXEC_SURE" = "true" ]; then
+		_wipe
+	else
+		gum confirm "${COMMON_PREFIX}are you 100% certain?" && _wipe || return
+	fi
 }
 
-[[ "$WMS_EXEC_DRY" == false ]] && commonYN "wipe persistent data?" _genWipePersistent
 
 # endregion: remove config and persistent data
 # region: process templates
 
 function _genTemplates() {
-	commonPrintf " "
 	commonPrintf "processing templates:"
-	commonPrintf " "
 	for template in $( find $WMS_PATH_TEMPLATES/* ! -name '.*' -print ); do
 		target=$( commonSetvar $template )
 		target=$( echo $target | sed s+$WMS_PATH_TEMPLATES+$WMS_PATH_WORKBENCH+ )
@@ -156,8 +122,9 @@ function _genTemplates() {
 			commonPrintfBold "rename and cp: $templateRel -> $targetRel" "${COMMON_BLUE}%s\n${COMMON_NORM}"
 			cp $template $target
 		elif [[ $(file --mime-encoding -b $template) == "binary" ]]; then
-			commonPrintf "binary or empty: $templateRel -> $targetRel" "${COMMON_RED}%s\n${COMMON_NORM}"
-			cp $template $target
+			# gum spin --title "$( echo ${COMMON_RED}binary or empty: $templateRel -> $targetRel ${COMMON_NORM})" -- cp $template $target
+			gum spin --title "binary or empty: $templateRel -> $targetRel" -- cp  $template $target 
+			commonPrintfBold "binary or empty: $templateRel -> $targetRel" "${COMMON_RED}%s\n${COMMON_NORM}"
 		elif [[ -f $template ]]; then
 			commonPrintf "processed: $templateRel -> $targetRel"
 			( echo "cat <<EOF" ; cat $template ; echo EOF ) | sh > $target
@@ -167,75 +134,177 @@ function _genTemplates() {
 		fi
 	done
 
-	# commonPrintf " "
-	# commonPrintf "unpacking private docker repo"
-	# commonPrintf " "
-	# out=$( tar -C ${COMMON1_REGISTRY_DATA}/ -xzvf ${COMMON1_REGISTRY_DATA}/docker.tgz  )
-	# commonVerify $? "failed: $out" "docker repo in place"
-	# out=$( rm ${COMMON1_REGISTRY_DATA}/docker.tgz  )
-	# commonVerify $? "failed: $out" "docker repo archive removed"
+	out=$( gum spin --title "unpacking private docker registry" -- tar -C ${WMS_STACK1_DATA}/ -xzvf $WMS_STACK1_REPO  )
+	commonVerify $? "failed: $out" "docker repo in place"
+	out=$( rm  $WMS_STACK1_REPO )
+	commonVerify $? "failed: $out" "docker repo archive removed"
 
 	unset out
 	unset template
 	unset target
 }
 
-[[ "$WMS_EXEC_DRY" == false ]] && commonYN "process templates?" _genTemplates 
-
 # endregion: process templates
 # region: registry
 
 function _genRegistry() {
 
-	_inner() {
-		commonPrintf " "
-		commonPrintf "setting tls cert and key for docker registry"
-		commonPrintf " "
+	commonPrintf "setting tls cert and key for docker registry"
+	out=$( openssl req \
+		-newkey rsa:4096 -nodes -sha256 -keyout ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.key \
+		-addext "subjectAltName = DNS:${WMS_STACK1_NAME}" \
+		-x509 -days 36500 -out ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt \
+		-batch )
+	commonVerify $? "failed: $out"
+	unset out
 
-		out=$( openssl req \
-			-newkey rsa:4096 -nodes -sha256 -keyout ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.key \
-			-addext "subjectAltName = DNS:${WMS_STACK1_NAME}" \
-			-x509 -days 36500 -out ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt \
-			-batch )
-		commonVerify $? "failed: $out"
-		unset out
-	}
-	commonYN "gen tls cert for docker registry?" _inner
+	local dir="/etc/docker/certs.d/${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}"
+	out=$( sudo mkdir -p "$dir" 2>&1 )
+	commonVerify $? "failed: $out"
+	out=$( sudo cp ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt "$dir/ca.crt" 2>&1 )
+	commonVerify $? "failed: $out" "${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt -> ${dir}/ca.crt in place"
+	unset out
 
-	_inner() {
-		local dir="/etc/docker/certs.d/${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}"
-		out=$( sudo mkdir -p "$dir" 2>&1 )
-		commonVerify $? "failed: $out"
-		out=$( sudo cp ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt "$dir/ca.crt" 2>&1 )
-		commonVerify $? "failed: $out" "${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt -> ${dir}/ca.crt in place"
-		unset out
-	}
-	commonYN "copy tls cert for registry?" _inner
+	out=$( gum spin --title "bootstrapping ${WMS_STACK1_NAME}" -- docker-compose -f $WMS_STACK1_CFG -p $WMS_DOCKER_NET up -d )
+	commonVerify $? "failed: $out" "${WMS_STACK1_NAME} is up"
+	unset out
 
-	_inner() {
-		commonPrintf " "
-		commonPrintf "bootstrapping >>>${WMS_STACK1_NAME}<<<"
-		commonPrintf " "
-		out=$( docker-compose -f $WMS_STACK1_CFG -p $WMS_DOCKER_NET up -d 2>&1 )
-		commonVerify $? "failed: $out" "${WMS_STACK1_NAME} is up"
-		unset out
-	}
-	commonYN "bootstrap ${WMS_STACK1_NAME}?" _inner
-
-	commonSleep $WMS_DOCKER_DELAY "waiting ${WMS_DOCKER_DELAY}s for the startup to finish"
-	unset _inner
+	#commonSleep $WMS_DOCKER_DELAY "waiting ${WMS_DOCKER_DELAY}s for the startup to finish"
+	gum spin --title "waiting ${WMS_DOCKER_DELAY}s for the startup to finish" -- sleep $WMS_DOCKER_DELAY 
 }
-[[ "$WMS_EXEC_DRY" == false ]] && commonYN "bootstrap ${WMS_STACK1_NAME}?" _genRegistry
 
 # endregion: registry
+# region: db
+
+function _genDb() {
+	out=$( gum spin --title "bootstrapping ${WMS_STACK2_NAME}" -- docker-compose -f $WMS_STACK2_CFG -p $WMS_DOCKER_NET up -d )
+	commonVerify $? "failed: $out" "${WMS_STACK2_NAME} is up"
+	gum spin --title "waiting ${WMS_DOCKER_DELAY}s for the startup to finish" -- sleep $WMS_DOCKER_DELAY
+	unset out
+}
+
+# endregion: db
+# region: mq
+
+function _genMq() {
+	out=$( gum spin --title "bootstrapping ${WMS_STACK3_NAME}" -- docker-compose -f $WMS_STACK3_CFG -p $WMS_DOCKER_NET up -d )
+	commonVerify $? "failed: $out" "${WMS_STACK3_NAME} is up"
+	gum spin --title "waiting ${WMS_DOCKER_DELAY}s for the startup to finish" -- sleep $WMS_DOCKER_DELAY
+	unset out
+}
+
+# endregion: mq
+# region: cdc
+
+function _genCdc() {
+	# launch maxwell
+	out=$( gum spin --title "bootstrapping ${WMS_STACK4_NAME}" --  docker-compose -f $WMS_STACK4_CFG -p $WMS_DOCKER_NET up -d )
+	commonVerify $? "failed: $out" "${WMS_STACK4_NAME} is up"
+	gum spin --title "waiting ${WMS_DOCKER_DELAY}s for the startup to finish" -- sleep $WMS_DOCKER_DELAY
+	unset out
+
+	# launch client
+	# cd ${WMS_PATH_BASE}/dummy_consumer
+	# go mod tidy
+	# go run dummy_consumer.go
+}
+
+# endregion: cdc
+# region: switchboard
+
+# region: check for dependencies
+
+commonYN "search for dependencies?" commonDeps ${COMMON_PREREQS[@]}
+
+# endregion: deps
+# region: startup warning
+
+gum style  'THIS SCRIPT CAN BE DESTRUCTIVE' 'IT SHOULD BE RUN WITH SPECIAL CARE ON THE MAIN MANAGER NODE'
+gum confirm "${COMMON_PREFIX}do you want to proceed?" && commonPrintf "okay then, going ahead..." || exit 0
+
+# endregion: startup
+# region: what to skip
+
+# define a mapping between functions and descriptions
+declare -A fnToSelected
+fnToSelected["_genNetwork"]="1. reset docker"
+fnToSelected["_genWipePersistent"]="2. remove persistent data"
+fnToSelected["_genTemplates"]="3. process templates"
+fnToSelected["_genRegistry"]="4. setup registry"
+fnToSelected["_genDb"]="5. bootstrap db"
+fnToSelected["_genMq"]="6. bootstrap mq"
+fnToSelected["_genCdc"]="7. bootstrap cdc"
+
+# extract values from fnToSelected
+fnToSelectedValues=()
+for key in "${!fnToSelected[@]}"; do
+	value="${fnToSelected[$key]}"
+	fnToSelectedValues+=("$value")
+done
+
+# array with sorted items
+declare -a fnToSelectedSorted=()
+while IFS= read -r line; do
+	if [ -n "$line" ]; then
+		fnToSelectedSorted+=("$line")
+	fi
+done <<< $(printf "%s\n" "${fnToSelectedValues[@]}" | sort)
+
+# gum options
+gumOptions=()
+for value in "${fnToSelectedSorted[@]}"; do
+	for key in "${!fnToSelected[@]}"; do
+		if [ "${fnToSelected[$key]}" == "$value" ]; then
+			gumOptions+=("$value")
+			break
+		fi
+	done
+done
+
+# get list of functions to skip
+if [ "$WMS_EXEC_FORCE" != "true" ]; then
+	gumSelected=$( gum choose --no-limit --header="${COMMON_PREFIX}everything is running by default, select what you want to skip:" "${gumOptions[@]}")
+else
+	gumSelected=()
+fi
+
+# arraw with function to skip
+declare -a gumSelectedArray=()
+while IFS= read -r line; do
+	if [ -n "$line" ]; then
+		gumSelectedArray+=("$line")
+	fi
+done <<< "$gumSelected"
+
+if [ ${#gumSelectedArray[@]} -eq 0 ]; then
+	commonPrintf "nothing will be skipped"
+else
+	commonPrintf "these steps will be skipped: $(commonJoinArray gumSelectedArray "\n%s" "")"
+fi
+
+# endregion: skip
+# region: exec
+
+# execute functions in the order of fnToSelectedSorted... bash is braindead
+for element in "${fnToSelectedSorted[@]}"; do
+	for fn in "${!fnToSelected[@]}"; do
+		if [ "${fnToSelected[$fn]}" == "$element" ]; then
+			if [[ -n "$element" && " ${gumSelectedArray[*]} " == *" $element "* ]]; then
+				commonPrintf "skipping \"$element\""
+			else
+				commonPrintf "entering \"$element\" phase"
+				[[ "$WMS_EXEC_DRY" == false ]] && $fn
+			fi
+			break
+		fi
+	done
+done
+
+# endregion: exec
+
+# endregion: switchboard
 # region: closing provisions
 
-_prefix="$COMMON_PREFIX"
-COMMON_PREFIX="===>>> "
-commonPrintfBold " "
-commonPrintfBold "ALL DONE! IF THIS IS FINAL, ISSUE THE FOLLOWING COMMAND: sudo chmod a-x ${WMS_PATH_SCRIPTS}/genesis.sh"
-commonPrintfBold " "
-COMMON_PREFIX="_prefix"
-unset _prefix
+gum style  'ALL DONE!' 'IF THIS IS FINAL, ISSUE THE FOLLOWING COMMAND:' "sudo chmod a-x ${WMS_PATH_SCRIPTS}/genesis.sh"
 
 # endregion: closing

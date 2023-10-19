@@ -1,0 +1,44 @@
+version: "3.3"
+
+networks:
+  ${WMS_DOCKER_NET}:
+    external: true
+    # name: ${WMS_DOCKER_NET}
+
+services:
+  ${WMS_STACK2_S1_NAME}:
+    environment:
+      # - MARIADB_ROOT_PASSWORD=example
+      - MARIADB_ROOT_PASSWORD_HASH=$WMS_STACK2_S1_ROOTPW
+    hostname: ${WMS_STACK2_S1_FQDN}
+    image: ${WMS_STACK2_S1_IMG}
+    labels:
+      service: ${WMS_STACK2_S1_FQDN}
+    networks:
+      ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.3
+        aliases:
+          - ${WMS_STACK2_S1_NAME}
+          - ${WMS_STACK2_S1_FQDN}
+    ports:
+      - ${WMS_STACK2_S1_PORT}:3306
+    restart: always
+    volumes:
+      - ${WMS_STACK2_S1_CONF}:/etc/mysql
+      - ${WMS_STACK2_S1_DATA}:/var/lib/mysql
+      - ${WMS_STACK2_S1_INIT}:/docker-entrypoint-initdb.d
+
+  ${WMS_STACK2_S2_NAME}:
+    hostname: ${WMS_STACK2_S2_FQDN}
+    image: ${WMS_STACK2_S2_IMG}
+    labels:
+      service: ${WMS_STACK2_S2_FQDN}
+    networks:
+      ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.4
+        aliases:
+          - ${WMS_STACK2_S2_NAME}
+          - ${WMS_STACK2_S2_FQDN}
+    ports:
+      - ${WMS_STACK2_S2_PORT}:8080
+    restart: always

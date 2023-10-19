@@ -20,13 +20,12 @@ commonPP $WMS_PATH_SCRIPTS
 
 # endregion: config
 
-for img in ${WMS_STACK1_IMAGES[@]}; do
-	privimg=${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}/${WMS_DOCKER_NET}-${img}
-	commonPrintf "$img"
-	docker pull $img
-	docker tag $img $privimg
-	docker push $privimg 
-	docker image remove $img
-	# docker image remove $privimg
-done
-unset img privimg
+ip=$( docker inspect ${WMS_DOCKER_NET}_${WMS_STACK2_S1_NAME}_1 | jq -r ".[0].NetworkSettings.Networks.${WMS_DOCKER_NET}.Gateway" )
+
+docker run -it --rm $WMS_STACK4_S1_IMG bin/maxwell	\
+	--user=$WMS_STACK4_S1_USER		\
+	--password=$WMS_STACK4_S1_PW	\
+	--producer=stdout	\
+	--host=$ip	\
+	--port=$WMS_STACK2_S1_PORT
+
