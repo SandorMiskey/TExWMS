@@ -3,6 +3,9 @@
 ## NOW
 
 * cdc client
+  * config channel to modify action set
+    * load default set
+    * add, rm
   * action based on db & table
     * default set
     * actions
@@ -10,7 +13,6 @@
       * api call
       * external command
       * function with parameters
-  * config channel to modify action set
 * config producer
 
 ## NEXT
@@ -29,6 +31,7 @@
 * Celery
   * <https://docs.celeryq.dev/en/stable/index.html>
   * <https://github.com/celery/celery>
+  * <https://pkg.go.dev/github.com/gocelery/gocelery>
 
 ### Internal
 
