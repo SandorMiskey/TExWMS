@@ -27,3 +27,22 @@ services:
     volumes:
       - ${WMS_STACK3_S1_CONF}:/etc/rabbitmq/
       - ${WMS_STACK3_S1_DATA}:/var/lib/rabbitmq
+
+  ${WMS_STACK3_S2_NAME}:
+    hostname: ${WMS_STACK3_S2_FQDN}
+    image: ${WMS_STACK3_S2_IMG}
+    labels:
+      service: ${WMS_STACK3_S2_FQDN}
+    networks:
+      ${WMS_DOCKER_NET}:
+        # ipv4_address: 10.96.0.5
+        aliases:
+          - ${WMS_STACK3_S2_NAME}
+          - ${WMS_STACK3_S2_FQDN}
+    ports:
+      - ${WMS_STACK3_S2_PORT_REDIS}:6379
+      - ${WMS_STACK3_S2_PORT_INSIGHT}:8001
+    restart: always
+    volumes:
+      - ${WMS_STACK3_S2_CONF}:/usr/local/etc/redis/redis.conf
+      - ${WMS_STACK3_S2_DATA}:/data

@@ -21,7 +21,7 @@ commonPP $WMS_PATH_SCRIPTS
 # endregion: config
 
 for img in ${WMS_STACK1_IMAGES[@]}; do
-	privimg=${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}/${WMS_DOCKER_NET}-${img}
+	privimg=${WMS_STACK1_PREFIX}-${img}
 	commonPrintf "$img"
 	docker pull $img
 	docker tag $img $privimg

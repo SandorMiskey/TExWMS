@@ -13,6 +13,9 @@
       * api call
       * external command
       * function with parameters
+* redis security
+  * <https://redis.io/docs/management/security/>
+  * <http://antirez.com/news/96>
 * config producer
 
 ## NEXT
