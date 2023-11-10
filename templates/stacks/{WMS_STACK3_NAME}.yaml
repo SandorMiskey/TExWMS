@@ -29,6 +29,8 @@ services:
       - ${WMS_STACK3_S1_DATA}:/var/lib/rabbitmq
 
   ${WMS_STACK3_S2_NAME}:
+    environment:
+      - REDIS_ARGS=${WMS_STACK3_S2_REDIS_ARGS}
     hostname: ${WMS_STACK3_S2_FQDN}
     image: ${WMS_STACK3_S2_IMG}
     labels:

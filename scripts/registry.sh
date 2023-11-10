@@ -20,8 +20,8 @@ commonPP $WMS_PATH_SCRIPTS
 
 # endregion: config
 
-for img in ${WMS_STACK1_IMAGES[@]}; do
-	privimg=${WMS_STACK1_PREFIX}-${img}
+for img in ${WMS_DOCKER_IMAGES[@]}; do
+	privimg=${WMS_DOCKER_PREFIX}${img}
 	commonPrintf "$img"
 	docker pull $img
 	docker tag $img $privimg

@@ -23,7 +23,6 @@ commonPP $WMS_PATH_SCRIPTS
 
 function _genNetwork() {
 		local out
-		commonPrintf "reseting docker"
 
 		# halt services
 		for cfg in ${WMS_DOCKER_STACKS}/*; do
@@ -106,7 +105,6 @@ _genWipePersistent() {
 # region: process templates
 
 function _genTemplates() {
-	commonPrintf "processing templates:"
 	for template in $( find $WMS_PATH_TEMPLATES/* ! -name '.*' -print ); do
 		target=$( commonSetvar $template )
 		target=$( echo $target | sed s+$WMS_PATH_TEMPLATES+$WMS_PATH_WORKBENCH+ )
@@ -134,14 +132,23 @@ function _genTemplates() {
 		fi
 	done
 
+	# out=$( gum spin --title "unpacking private docker registry" -- tar -C ${WMS_STACK1_DATA}/ -xzvf $WMS_STACK1_REPO  )
+	# commonVerify $? "failed: $out" "docker repo in place"
+	# out=$( rm  $WMS_STACK1_REPO )
+	# commonVerify $? "failed: $out" "docker repo archive removed"
+
+	unset out
+	unset template
+	unset target
+}
+
+function _genTemplatesRegistry() {
 	out=$( gum spin --title "unpacking private docker registry" -- tar -C ${WMS_STACK1_DATA}/ -xzvf $WMS_STACK1_REPO  )
 	commonVerify $? "failed: $out" "docker repo in place"
 	out=$( rm  $WMS_STACK1_REPO )
 	commonVerify $? "failed: $out" "docker repo archive removed"
 
 	unset out
-	unset template
-	unset target
 }
 
 # endregion: process templates
@@ -177,7 +184,7 @@ function _genRegistry() {
 # region: db
 
 function _genDb() {
-	out=$( gum spin --title "bootstrapping ${WMS_STACK2_NAME}" -- docker-compose -f $WMS_STACK2_CFG -p $WMS_DOCKER_NET up -d )
+	out=$( gum spin --title "bootstrapping ${WMS_STACK2_NAME}" -- docker-compose -f $WMS_STACK2_CFG -p $WMS_DOCKER_NET up -d 2>&1 )
 	commonVerify $? "failed: $out" "${WMS_STACK2_NAME} is up"
 	gum spin --title "waiting ${WMS_DOCKER_DELAY}s for the startup to finish" -- sleep $WMS_DOCKER_DELAY
 	unset out
@@ -230,10 +237,11 @@ declare -A fnToSelected
 fnToSelected["_genNetwork"]="1. reset docker"
 fnToSelected["_genWipePersistent"]="2. remove persistent data"
 fnToSelected["_genTemplates"]="3. process templates"
-fnToSelected["_genRegistry"]="4. setup registry"
-fnToSelected["_genDb"]="5. bootstrap db"
-fnToSelected["_genMq"]="6. bootstrap mq"
-fnToSelected["_genCdc"]="7. bootstrap cdc"
+fnToSelected["_genTemplatesRegistry"]="4. populate docker registry"
+fnToSelected["_genRegistry"]="5. setup registry"
+fnToSelected["_genDb"]="6. bootstrap db"
+fnToSelected["_genMq"]="7. bootstrap mq"
+fnToSelected["_genCdc"]="8. bootstrap cdc"
 
 # extract values from fnToSelected
 fnToSelectedValues=()
@@ -292,7 +300,7 @@ for element in "${fnToSelectedSorted[@]}"; do
 			if [[ -n "$element" && " ${gumSelectedArray[*]} " == *" $element "* ]]; then
 				commonPrintf "skipping \"$element\""
 			else
-				commonPrintf "entering \"$element\" phase"
+				commonPrintfBold "entering \"$element\" phase"
 				[[ "$WMS_EXEC_DRY" == false ]] && $fn
 			fi
 			break

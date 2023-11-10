@@ -20,8 +20,8 @@ services:
         aliases:
           - ${WMS_STACK2_S1_NAME}
           - ${WMS_STACK2_S1_FQDN}
-    # ports:
-    #   - ${WMS_STACK2_S1_PORT}:3306
+    ports:
+      - ${WMS_STACK2_S1_PORT}:3306
     restart: always
     volumes:
       - ${WMS_STACK2_S1_CONF}:/etc/mysql
