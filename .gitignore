@@ -1,6 +1,5 @@
 bin
 doc/legacy
-proto/
 scripts/.env.sh
 scripts/worksheet.sh
 scripts/proto.sh

@@ -1,7 +1,6 @@
 go 1.21.3
 
 use (
-	./cdc-broker
+	./broker
 	./common
-	./proto
 )
