@@ -1,6 +1,6 @@
 bin
 doc/legacy
-scripts/.env.sh
+scripts/env.sh
 scripts/worksheet.sh
 scripts/proto.sh
 templates/{WMS_STACK1_NAME}/docker.tgz

@@ -13,7 +13,7 @@
 
 # get them from .env 
 export WMS_PATH_BASE=$WMS_PATH_BASE
-export WMS_PATH_RC=$WMS_PATH_RC
+export WMS_PATH_RC=${WMS_PATH_BASE}/scripts/config.sh
 
 # dirs under base
 export WMS_PATH_BIN=${WMS_PATH_BASE}/bin
@@ -28,7 +28,7 @@ export WMS_PATH_COMMON=${WMS_PATH_SCRIPTS}/common.sh
 export PATH=${WMS_PATH_BIN}:${WMS_PATH_SCRIPTS}:$PATH
 
 # dirs under workbench
-export WMS_PATH_WORKBENCH=/srv/TExWMS
+export WMS_PATH_WORKBENCH=$WMS_PATH_LOCALWORKBENCH
 export WMS_PATH_STACKS=${WMS_PATH_WORKBENCH}/stacks
 # export WMS_PATH_REGISTRY=${WMS_PATH_WORKBENCH}/registry
 # export WMS_PATH_DB=${WMS_PATH_WORKBENCH}/db
