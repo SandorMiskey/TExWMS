@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # Copyright TE-FOOD International GmbH., All Rights Reserved

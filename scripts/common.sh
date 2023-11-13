@@ -160,7 +160,7 @@ function commonIterate() {
 }
 
 function commonJoinArray() {
-	# this isn't POSIX sh comliant
+	# this won't work with bash 3
 	# local -n arr=$1
 	# [[ ${2:-"unset"} == "unset" ]] && local form="%s\n" || local form="$2"
 	# [[ ${3:-"unset"} == "unset" ]] && local cut="" || local cut="$3"
@@ -168,7 +168,7 @@ function commonJoinArray() {
 	# printf -v out "$form" "${arr[@]}"
 	# echo "${out%$cut}"
 
-	# this is still a long way from strict compliance, but it will do for now
+	# this is still a long way from any kind of posix compliance, but it will do for now
 	[[ ${1:-"unset"} == "unset" ]] && local form="%s\n" || local form="$1"
 	[[ ${2:-"unset"} == "unset" ]] && local cut="" || local cut="$2"
 	shift 2

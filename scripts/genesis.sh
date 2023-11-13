@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # Copyright TE-FOOD International GmbH., All Rights Reserved
@@ -236,8 +236,8 @@ gum confirm "${COMMON_PREFIX}do you want to proceed?" && commonPrintf "okay then
 # no associative arrays to maintain POSIX /bin/sh compliance, so care must be
 # taken to ensure that the functions to be called and their descriptions are
 # given in the same order, which will also be the order of display and
-# processing... still quite far from full compatibility, but for now it will
-# be fine
+# processing... is still quite far from full compatibility, so for now we'll
+# settle for it to work with bash 3...
 
 # mapping between functions and descriptions
 declare -a fnNames
