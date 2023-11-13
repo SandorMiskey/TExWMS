@@ -1,5 +1,3 @@
-#!/bin/bash
-
 #
 # Copyright TE-FOOD International GmbH., All Rights Reserved
 #
@@ -13,7 +11,7 @@
 
 # get them from .env 
 export WMS_PATH_BASE=$WMS_PATH_BASE
-export WMS_PATH_RC=${WMS_PATH_BASE}/scripts/config.sh
+export WMS_PATH_RC=$WMS_PATH_RC
 
 # dirs under base
 export WMS_PATH_BIN=${WMS_PATH_BASE}/bin
@@ -46,7 +44,7 @@ export WMS_EXEC_VERBOSE=true
 # endregion: exec contorl
 # region: versions and deps
 
-export WMS_DEPS_BINS=('docker' 'docker-compose' 'jq' 'go' 'gum')
+export WMS_DEPS_BINS=('docker' 'docker-compose' 'jq' 'go' 'gum' 'openssl')
 
 export WMS_DEPS_DB=mariadb:10.11.5
 export WMS_DEPS_ADMINER=adminer:4.8.1

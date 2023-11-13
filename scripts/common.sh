@@ -1,8 +1,31 @@
-#!/bin/bash
-
 #
 # Copyright TE-FOOD International GmbH., All Rights Reserved
 #
+
+function commonContinue() {
+	local question=$1; shift
+	local answer
+
+	if [[ "$COMMON_FORCE" == "true" ]]; then
+		commonPrintfBold "commonYN(): forced Y for '$question'" 
+		answer="Y"
+	else
+		commonPrintfBold "$question [Y/n] " "%s"
+		read answer
+	fi
+	case "$answer" in
+		y | Y)
+			commonPrintf "okay, going ahead"
+			;;
+		n | N)
+			exit
+			;;
+		*)
+			commonPrintf "'y' or 'n'"
+			commonContinue "$question"
+			;;
+	esac	
+}
 
 function commonDefaults() {
 	#
@@ -52,98 +75,6 @@ function commonDefaults() {
 }
 commonDefaults
 
-function commonPrintf() {
-	#
-	# fancy echo
-	#
-	# usage:
-	# -> commonPrintfBold "stuff to print" <printf format string>
-	#
-	# possible conf variables:
-	# -> COMMON_SILENT=false
-	# -> COMMON_PREFIX="===> "
-	# -> COMMON_BOLD=$(tput bold)
-	# -> COMMON_NORM=$(tput sgr0)
-
-	commonDefaults
-	[[ "$COMMON_SILENT" == true ]] && return 0
-	[[ "$COMMON_VERBOSE" == true ]] || return 0
-	[[ ${2:-"unset"} == "unset" ]] && local format="%s\n" || local format=$2
-	[[ ${3:-"unset"} == "unset" ]] && local out="/dev/stdout" || local out=$3
-	printf $format "${COMMON_PREFIX}$( printf "%s\n" "$1" | head -n 1 )" >> $out
-	# printf $format "${TExPREFIX}$1"
-
-	local lines=$( printf "%s\n" "$1" | wc -l )
-	local cnt=2
-	if [ $lines -gt 1 ]; then
-		while [ $cnt -le $lines ] ; do
-			printf $format "${COMMON_SUBPREFIX}$( printf "%s\n" "$1" | tail -n +$cnt | head -n 1 )" >> $out 
-			cnt=$(expr $cnt + 1)
-		done
-	fi
-}
-
-function commonPrintfBold() {
-	[[ ${2:-"unset"} == "unset" ]] && format="%s\n" || format=$2
-	[[ ${3:-"unset"} == "unset" ]] && out="/dev/stdout" || out=$3
-	local verbose=$COMMON_VERBOSE
-	COMMON_VERBOSE=true
-	commonPrintf "$1" "${COMMON_BOLD}$format${COMMON_NORM}" "$out"
-	COMMON_VERBOSE=$verbose
-}
-
-function commonSleep() {
-	#
-	# sleep w/ ticker
-	#
-	# usage:
-	# -> COMMON_Sleep <secs to sleep> [msg]
-
-	local delay
-	local msg
-	[[ ${1:-"unset"} == "unset" ]] && delay=3 || delay=$1
-	[[ ${2:-"unset"} == "unset" ]] && msg="sleeping for ${delay}s" || msg=$2
-
-	commonPrintf "$msg" "%s"
-	local cnt
-	for cnt in `seq 1 $delay`; do
-		commonPrintf '%s' "."
-		sleep 1
-	done
-
-	local prefix=$COMMON_PREFIX
-	export COMMON_PREFIX=" "
-	commonPrintf '\n' " "
-	export COMMON_PREFIX=$prefix
-}
-
-function commonVerify() {
-	#
-	# dumps $2 if $1 -ne 0, exits if necessary
-	#
-	# typical usage:
-	# -> commonVerify $? "error message"
-	#
-	# possible conf variables:
-	# -> TE_PANIC=false
-
-	commonDefaults
-	if [ $1 -ne 0 ]
-	then
-		# >&2 commonPrintfBold "$2" "\b${COMMON_BOLD}%s${COMMON_NORM}\n"
-		[[ -z "$2" ]] || >&2 commonPrintfBold "$2" "%s\n" "/dev/stderr"
-		if [[ "$COMMON_PANIC" == true ]]; then
-			if [ ! "$COMMON_SHELL" = "bash" ] && [ ! "$COMMON_SHELL" = "zsh" ]; then
-				commonPrintfBold "commonVerify(): COMMON_PANIC set to 'true' and no interactive shell detected, leaving..." "%s\n" "/dev/stderr"
-				exit 1
-			fi
-			commonPrintfBold "commonVerify(): COMMON_PANIC set to 'true' but shell seems to be interactive ($COMMON_SHELL), so keep rolling..." "%s\n" "/dev/stderr"
-		fi
-	else
-		if [ -z ${3+x} ]; then echo -n ""; else commonPrintf "$3"; fi
-	fi
-}
-
 function commonDeps() {
 	#
 	# check if prerequisites are available
@@ -176,88 +107,6 @@ function commonDeps() {
 		fi
 	done
 
-}
-
-function commonYN() {
-	local question=$1
-	local ans
-	shift
-
-	if [[ "$COMMON_FORCE" == "true" ]]; then
-		# commonPrintfBold "forced Y for '$question'" "${COMMON_BOLD}${COMMON_PREFIX}%s${COMMON_NORM} \n"
-		# commonPrintfBold "COMMON_YN(): forced Y for '$question'" "${COMMON_BOLD}%s${COMMON_NORM}\n"
-		commonPrintfBold "commonYN(): forced Y for '$question'" 
-		ans="Y"
-	else
-		commonPrintfBold "$question [Y/n] " "%s"
-		read ans
-		# read -p "${COMMON_BOLD}${COMMON_PREFIX}$question [Y/n]${COMMON_NORM} " ans
-	fi
-	case "$ans" in
-		y | Y | "")
-			"$@"
-			;;
-		n | N)
-			commonPrintf "skipping"
-			;;
-		*)
-			commonPrintf "'y' or 'n'"
-			commonYN "$question" "$@"
-			;;
-	esac
-}
-
-function commonContinue() {
-	local question=$1; shift
-	local answer
-
-	if [[ "$COMMON_FORCE" == "true" ]]; then
-		commonPrintfBold "commonYN(): forced Y for '$question'" 
-		answer="Y"
-	else
-		commonPrintfBold "$question [Y/n] " "%s"
-		read answer
-	fi
-	case "$answer" in
-		y | Y)
-			commonPrintf "okay, going ahead"
-			;;
-		n | N)
-			exit
-			;;
-		*)
-			commonPrintf "'y' or 'n'"
-			commonContinue "$question"
-			;;
-	esac	
-}
-
-function commonPP() {
-	pushd ${PWD} > /dev/null
-	trap "popd > /dev/null" EXIT
-	cd $1
-}
-
-function commonSetvar() {
-	# replaces env variables with its value in strings
-	target=$1
-	while [[ $target =~ ^(.*)(\{[a-zA-Z0-9_]+\})(.*)$ ]] ; do
-		varname=${BASH_REMATCH[2]}
-		varname=${varname#"{"}
-		varname=${varname%\}}
-		printf -v target "%s%s%s" "${BASH_REMATCH[1]}" "${!varname}" "${BASH_REMATCH[3]}"
-	done
-	printf "%s" $target
-}
-
-function commonJoinArray() {
-	local -n arr=$1
-	[[ ${2:-"unset"} == "unset" ]] && local form="%s\n" || local form="$2"
-	[[ ${3:-"unset"} == "unset" ]] && local cut="" || local cut="$3"
-	local out
-	printf -v out "$form" "${arr[@]}"
-	# printf "${out%$cut}"
-	echo "${out%$cut}"
 }
 
 function commonIterate() {
@@ -308,4 +157,178 @@ function commonIterate() {
 	done
 
 	unset mode prefix type field suffix
+}
+
+function commonJoinArray() {
+	# this isn't POSIX sh comliant
+	# local -n arr=$1
+	# [[ ${2:-"unset"} == "unset" ]] && local form="%s\n" || local form="$2"
+	# [[ ${3:-"unset"} == "unset" ]] && local cut="" || local cut="$3"
+	# local out
+	# printf -v out "$form" "${arr[@]}"
+	# echo "${out%$cut}"
+
+	# this is still a long way from strict compliance, but it will do for now
+	[[ ${1:-"unset"} == "unset" ]] && local form="%s\n" || local form="$1"
+	[[ ${2:-"unset"} == "unset" ]] && local cut="" || local cut="$2"
+	shift 2
+	declare -a arr
+	for arg in "$@"; do
+		arr+=("$arg")
+	done
+	local out
+	printf -v out "$form" "${arr[@]}"
+	echo "${out%$cut}"
+}
+
+function commonPP() {
+	pushd ${PWD} > /dev/null
+	trap "popd > /dev/null" EXIT
+	cd $1
+}
+
+function commonPrintf() {
+	#
+	# fancy echo
+	#
+	# usage:
+	# -> commonPrintfBold "stuff to print" <printf format string>
+	#
+	# possible conf variables:
+	# -> COMMON_SILENT=false
+	# -> COMMON_PREFIX="===> "
+	# -> COMMON_BOLD=$(tput bold)
+	# -> COMMON_NORM=$(tput sgr0)
+	#
+	# TODO: this might be outdated
+
+	commonDefaults
+	[[ "$COMMON_SILENT" == true ]] && return 0
+	[[ "$COMMON_VERBOSE" == true ]] || return 0
+	[[ ${2:-"unset"} == "unset" ]] && local format="%s\n" || local format=$2
+	[[ ${3:-"unset"} == "unset" ]] && local out="/dev/stdout" || local out=$3
+	printf $format "${COMMON_PREFIX}$( printf "%s\n" "$1" | head -n 1 )" >> $out
+
+	local lines=$( printf "%s\n" "$1" | wc -l )
+	local cnt=2
+	if [ $lines -gt 1 ]; then
+		while [ $cnt -le $lines ] ; do
+			printf $format "${COMMON_SUBPREFIX}$( printf "%s\n" "$1" | tail -n +$cnt | head -n 1 )" >> $out 
+			cnt=$(expr $cnt + 1)
+		done
+	fi
+}
+
+function commonPrintfBold() {
+	[[ ${2:-"unset"} == "unset" ]] && format="%s\n" || format=$2
+	[[ ${3:-"unset"} == "unset" ]] && out="/dev/stdout" || out=$3
+	local verbose=$COMMON_VERBOSE
+	COMMON_VERBOSE=true
+	commonPrintf "$1" "${COMMON_BOLD}$format${COMMON_NORM}" "$out"
+	COMMON_VERBOSE=$verbose
+}
+
+function commonSetvar() {
+	# obsolete bash specific version
+	# target=$1
+	# while [[ $target =~ ^(.*)(\{[a-zA-Z0-9_]+\})(.*)$ ]] ; do
+	# 	varname=${BASH_REMATCH[2]}
+	# 	varname=${varname#"{"}
+	# 	varname=${varname%\}}
+	# 	printf -v target "%s%s%s" "${BASH_REMATCH[1]}" "${!varname}" "${BASH_REMATCH[3]}"
+	# done
+	# printf "%s" $target
+
+	# replaces environment variables with their values in strings
+	target=$1
+	while echo "$target" | grep -qE '^(.*)(\{[a-zA-Z0-9_]+\})(.*)$'; do
+		# varname=$(echo "$target" | sed -n 's/.*{\([a-zA-Z0-9_]\+\)}.*/\1/p')
+		varname=$(echo "$target" | sed -n   's/.*{\([a-zA-Z0-9_-]*\)}.*/\1/p')
+		value=$(eval echo "\$$varname")
+		target=$(echo "$target" | sed "s/{${varname}}/${value}/")
+	done
+	printf "%s" "$target"
+}
+
+function commonSleep() {
+	#
+	# sleep w/ ticker
+	#
+	# usage:
+	# -> COMMON_Sleep <secs to sleep> [msg]
+
+	local delay
+	local msg
+	[[ ${1:-"unset"} == "unset" ]] && delay=3 || delay=$1
+	[[ ${2:-"unset"} == "unset" ]] && msg="sleeping for ${delay}s" || msg=$2
+
+	commonPrintf "$msg" "%s"
+	local cnt
+	for cnt in `seq 1 $delay`; do
+		commonPrintf '%s' "."
+		sleep 1
+	done
+
+	local prefix=$COMMON_PREFIX
+	export COMMON_PREFIX=" "
+	commonPrintf '\n' " "
+	export COMMON_PREFIX=$prefix
+}
+
+function commonSudo() {
+	sudo ls > /dev/null
+}
+
+function commonVerify() {
+	#
+	# dumps $2 if $1 -ne 0, exits if necessary
+	#
+	# typical usage:
+	# -> commonVerify $? "error message"
+	#
+	# possible conf variables:
+	# -> TE_PANIC=false
+
+	commonDefaults
+	if [ $1 -ne 0 ]
+	then
+		# >&2 commonPrintfBold "$2" "\b${COMMON_BOLD}%s${COMMON_NORM}\n"
+		[[ -z "$2" ]] || >&2 commonPrintfBold "$2" "%s\n" "/dev/stderr"
+		if [[ "$COMMON_PANIC" == true ]]; then
+			if [ ! "$COMMON_SHELL" = "bash" ] && [ ! "$COMMON_SHELL" = "zsh" ]; then
+				commonPrintfBold "commonVerify(): COMMON_PANIC set to 'true' and no interactive shell detected, leaving..." "%s\n" "/dev/stderr"
+				exit 1
+			fi
+			commonPrintfBold "commonVerify(): COMMON_PANIC set to 'true' but shell seems to be interactive ($COMMON_SHELL), so keep rolling..." "%s\n" "/dev/stderr"
+		fi
+	else
+		# if [ -z ${3+x} ]; then echo -n ""; else commonPrintf "$3"; fi
+		if [ -z "${3+x}" ]; then printf ""; else commonPrintf "$3"; fi
+	fi
+}
+
+function commonYN() {
+	local question=$1
+	local ans
+	shift
+
+	if [[ "$COMMON_FORCE" == "true" ]]; then
+		commonPrintfBold "commonYN(): forced Y for '$question'" 
+		ans="Y"
+	else
+		commonPrintfBold "$question [Y/n] " "%s"
+		read ans
+	fi
+	case "$ans" in
+		y | Y | "")
+			"$@"
+			;;
+		n | N)
+			commonPrintf "skipping"
+			;;
+		*)
+			commonPrintf "'y' or 'n'"
+			commonYN "$question" "$@"
+			;;
+	esac
 }

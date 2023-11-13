@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 #
 # Copyright TE-FOOD International GmbH., All Rights Reserved
@@ -13,65 +13,70 @@ if [ ! -f  $WMS_PATH_RC ]; then
 fi
 source $WMS_PATH_RC
 
-if [[ ${WMS_PATH_SCRIPTS:-"unset"} == "unset" ]]; then
-	commonVerify 1 "WMS_PATH_SCRIPTS is unset"
-fi
-commonPP $WMS_PATH_SCRIPTS
+# if [[ ${WMS_PATH_SCRIPTS:-"unset"} == "unset" ]]; then
+# 	commonVerify 1 "WMS_PATH_SCRIPTS is unset"
+# fi
+# commonPP $WMS_PATH_SCRIPTS
 
 # endregion: config
+# region: steps
+
 # region: docker reset
 
 function _genNetwork() {
-		local out
+	local out
 
-		# halt services
-		for cfg in ${WMS_DOCKER_STACKS}/*; do
-			out=$( gum spin --title "$cfg is going down" -- docker-compose -f $cfg -p $WMS_DOCKER_NET down )
-			# commonVerify $? "failed to stop services: $out" "$cfg halted"
-			commonPrintf "$cfg is down"
-		done
-		unset cfg
+	# halt services
+	for cfg in ${WMS_DOCKER_STACKS}/*; do
+		out=$( gum spin --title "$cfg is going down" -- docker-compose -f $cfg -p $WMS_DOCKER_NET down )
+		# commonVerify $? "failed to stop services: $out" "$cfg halted"
+		commonPrintf "$cfg is down"
+	done
+	unset cfg
 
-		# rm network
-		if [ "$(docker network ls --format "{{.Name}}" --filter "name=${WMS_DOCKER_NET}" | grep -w ${WMS_DOCKER_NET})" ]; then
-			out=$( docker network rm $WMS_DOCKER_NET 2>&1 )
-			commonVerify $? "failed to 'docker network rm' ${WMS_DOCKER_NET}: $out" "network rm done"
-		fi
+	# rm network
+	if [ "$(docker network ls --format "{{.Name}}" --filter "name=${WMS_DOCKER_NET}" | grep -w ${WMS_DOCKER_NET})" ]; then
+		out=$( docker network rm $WMS_DOCKER_NET 2>&1 )
+		commonVerify $? "failed to 'docker network rm' ${WMS_DOCKER_NET}: $out" "network rm done"
+	fi
 
-		# create network
-		out=$( docker network create $WMS_DOCKER_INIT 2>&1 )
-		commonVerify $? "failed to create network: $out" "$WMS_DOCKER_NET network is up"
+	# create network
+	out=$( docker network create $WMS_DOCKER_INIT 2>&1 )
+	commonVerify $? "failed to create network: $out" "$WMS_DOCKER_NET network is up"
 }
 
 # endregion: docker reset
 # region: remove config and persistent data
 
-_genWipePersistent() {
+_genWipe() {
 
 	_wipe() {
+		# authorize sudo
+		commonPrintf "root privilege required, sudo authorization check"
+		commonSudo
+
 		# purge or create workbench
 		if [ -z "$WMS_PATH_WORKBENCH" ]; then
 			commonVerify 1 "\$WMS_PATH_WORKBENCH should not be empty"
 		fi
 		if [ -d "$WMS_PATH_WORKBENCH" ]; then
 			commonPrintf "$WMS_PATH_WORKBENCH exists"
-			# err=$( sudo rm -rf "${WMS_PATH_WORKBENCH}/*" )
 			err=$( gum spin --title "removing ${WMS_PATH_WORKBENCH}/*" -- sudo find "$WMS_PATH_WORKBENCH" -mindepth 1 -delete )
 			commonVerify $? "$err" "cleaned ${WMS_PATH_WORKBENCH}/*"
 		else
-			commonPrintf "$PATH_WORKBENCH doesn't exists"
-			commonPrintf "mkdir -p -v $PATH_WORKBENCH" 
-			err=$( sudo mkdir -p -v "$PATH_WORKBENCH" )
-			commonVerify $? $err
+			commonPrintf "$WMS_PATH_WORKBENCH doesn't exists"
+			commonPrintf "mkdir -p -v $WMS_PATH_WORKBENCH" 
+			err=$( sudo mkdir -p -v "$WMS_PATH_WORKBENCH" 2>&1 )
+			commonVerify $? "$err"
 		fi
 
 		# reset
 		commonPrintf "chgrp and chmod g+rwx"
 		local grp=$( id -g )
 		err=$( sudo chgrp $grp "$WMS_PATH_WORKBENCH" )
-		commonVerify $? $err
+		commonVerify $? "$err"
 		err=$( sudo chmod g+rwx "$WMS_PATH_WORKBENCH" )
-		commonVerify $? $err
+		commonVerify $? "$err"
 
 		# remove localworkbench -> workbench symlink
 		local localworkbench=$(realpath "$WMS_PATH_LOCALWORKBENCH")
@@ -114,13 +119,12 @@ function _genTemplates() {
 		if [[ -d $template ]]; then
 			commonPrintf "mkdir: $templateRel -> $targetRel"
 			err=$( mkdir -p "$target" )
-			commonVerify $? $err
+			commonVerify $? "$err"
 		elif [[ $template == *_nope ]]; then
 			target=$( echo "$target" | sed s+_nope$++g )
 			commonPrintfBold "rename and cp: $templateRel -> $targetRel" "${COMMON_BLUE}%s\n${COMMON_NORM}"
 			cp $template $target
 		elif [[ $(file --mime-encoding -b $template) == "binary" ]]; then
-			# gum spin --title "$( echo ${COMMON_RED}binary or empty: $templateRel -> $targetRel ${COMMON_NORM})" -- cp $template $target
 			gum spin --title "binary or empty: $templateRel -> $targetRel" -- cp  $template $target 
 			commonPrintfBold "binary or empty: $templateRel -> $targetRel" "${COMMON_RED}%s\n${COMMON_NORM}"
 		elif [[ -f $template ]]; then
@@ -132,19 +136,14 @@ function _genTemplates() {
 		fi
 	done
 
-	# out=$( gum spin --title "unpacking private docker registry" -- tar -C ${WMS_STACK1_DATA}/ -xzvf $WMS_STACK1_REPO  )
-	# commonVerify $? "failed: $out" "docker repo in place"
-	# out=$( rm  $WMS_STACK1_REPO )
-	# commonVerify $? "failed: $out" "docker repo archive removed"
-
 	unset out
 	unset template
 	unset target
 }
 
-function _genTemplatesRegistry() {
+function _genTempRegistry() {
 	out=$( gum spin --title "unpacking private docker registry" -- tar -C ${WMS_STACK1_DATA}/ -xzvf $WMS_STACK1_REPO  )
-	commonVerify $? "failed: $out" "docker repo in place"
+	commonVerify $? "failed to unpack private docker repo" "docker repo in place"
 	out=$( rm  $WMS_STACK1_REPO )
 	commonVerify $? "failed: $out" "docker repo archive removed"
 
@@ -165,12 +164,12 @@ function _genRegistry() {
 	commonVerify $? "failed: $out"
 	unset out
 
-	local dir="/etc/docker/certs.d/${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}"
-	out=$( sudo mkdir -p "$dir" 2>&1 )
-	commonVerify $? "failed: $out"
-	out=$( sudo cp ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt "$dir/ca.crt" 2>&1 )
-	commonVerify $? "failed: $out" "${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt -> ${dir}/ca.crt in place"
-	unset out
+	# local dir="/etc/docker/certs.d/${WMS_DOCKER_REGISTRY_HOST}:${WMS_DOCKER_REGISTRY_PORT}"
+	# out=$( sudo mkdir -p "$dir" 2>&1 )
+	# commonVerify $? "failed: $out"
+	# out=$( sudo cp ${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt "$dir/ca.crt" 2>&1 )
+	# commonVerify $? "failed: $out" "${WMS_STACK1_DATA}/${WMS_STACK1_NAME}.crt -> ${dir}/ca.crt in place"
+	# unset out
 
 	out=$( gum spin --title "bootstrapping ${WMS_STACK1_NAME}" -- docker-compose -f $WMS_STACK1_CFG -p $WMS_DOCKER_NET up -d )
 	commonVerify $? "failed: $out" "${WMS_STACK1_NAME} is up"
@@ -217,6 +216,8 @@ function _genCdc() {
 }
 
 # endregion: cdc
+
+# endregion: steps
 # region: switchboard
 
 # region: check for dependencies
@@ -232,51 +233,36 @@ gum confirm "${COMMON_PREFIX}do you want to proceed?" && commonPrintf "okay then
 # endregion: startup
 # region: what to skip
 
-# define a mapping between functions and descriptions
-declare -A fnToSelected
-fnToSelected["_genNetwork"]="1. reset docker"
-fnToSelected["_genWipePersistent"]="2. remove persistent data"
-fnToSelected["_genTemplates"]="3. process templates"
-fnToSelected["_genTemplatesRegistry"]="4. populate docker registry"
-fnToSelected["_genRegistry"]="5. setup registry"
-fnToSelected["_genDb"]="6. bootstrap db"
-fnToSelected["_genMq"]="7. bootstrap mq"
-fnToSelected["_genCdc"]="8. bootstrap cdc"
+# no associative arrays to maintain POSIX /bin/sh compliance, so care must be
+# taken to ensure that the functions to be called and their descriptions are
+# given in the same order, which will also be the order of display and
+# processing... still quite far from full compatibility, but for now it will
+# be fine
 
-# extract values from fnToSelected
-fnToSelectedValues=()
-for key in "${!fnToSelected[@]}"; do
-	value="${fnToSelected[$key]}"
-	fnToSelectedValues+=("$value")
-done
+# mapping between functions and descriptions
+declare -a fnNames
+declare -a fnDescs
+fnNames+=("_genNetwork");		fnDescs+=("reset docker")
+fnNames+=("_genWipe");			fnDescs+=("remove persistent data")
+fnNames+=("_genTemplates");		fnDescs+=("process templates")
+fnNames+=("_genTempRegistry");	fnDescs+=("populate docker registry")
+fnNames+=("_genRegistry");		fnDescs+=("setup registry")
+fnNames+=("_genDb");			fnDescs+=("bootstrap db")
+fnNames+=("_genMq");			fnDescs+=("bootstrap mq")
+fnNames+=("_genCdc");			fnDescs+=("bootstrap cdc")
 
-# array with sorted items
-declare -a fnToSelectedSorted=()
-while IFS= read -r line; do
-	if [ -n "$line" ]; then
-		fnToSelectedSorted+=("$line")
-	fi
-done <<< $(printf "%s\n" "${fnToSelectedValues[@]}" | sort)
+# coose what to skip
+export GUM_CHOOSE_SELECTED=$( commonJoinArray %s, , "${fnDescs[@]}" )
+gumSelected=$(	\
+	gum choose	\
+	--no-limit	\
+	--ordered	\
+	--header="${COMMON_PREFIX}everything is running by default, select what you want to skip:" \
+	"${fnDescs[@]}"	\
+)
+unset GUM_CHOOSE_SELECTED
 
-# gum options
-gumOptions=()
-for value in "${fnToSelectedSorted[@]}"; do
-	for key in "${!fnToSelected[@]}"; do
-		if [ "${fnToSelected[$key]}" == "$value" ]; then
-			gumOptions+=("$value")
-			break
-		fi
-	done
-done
-
-# get list of functions to skip
-if [ "$WMS_EXEC_FORCE" != "true" ]; then
-	gumSelected=$( gum choose --no-limit --header="${COMMON_PREFIX}everything is running by default, select what you want to skip:" "${gumOptions[@]}")
-else
-	gumSelected=()
-fi
-
-# arraw with function to skip
+# list with selected items
 declare -a gumSelectedArray=()
 while IFS= read -r line; do
 	if [ -n "$line" ]; then
@@ -284,28 +270,38 @@ while IFS= read -r line; do
 	fi
 done <<< "$gumSelected"
 
-if [ ${#gumSelectedArray[@]} -eq 0 ]; then
+# show what will be skipped
+declare -a gumUnselected=()
+if [ ${#gumSelectedArray[@]} -eq ${#fnDescs[@]} ]; then
 	commonPrintf "nothing will be skipped"
 else
-	commonPrintf "these steps will be skipped: $(commonJoinArray gumSelectedArray "\n%s" "")"
+	for skipped in "${fnDescs[@]}"; do
+		if ! echo "${gumSelectedArray[@]}" | grep -q "\<$skipped\>"; then
+			gumUnselected+=("$skipped")
+			commonPrintf "\"$skipped\" will be skipped"
+		fi
+	done
 fi
 
-# endregion: skip
+# endregion: what to skip
 # region: exec
 
-# execute functions in the order of fnToSelectedSorted... bash is braindead
-for element in "${fnToSelectedSorted[@]}"; do
-	for fn in "${!fnToSelected[@]}"; do
-		if [ "${fnToSelected[$fn]}" == "$element" ]; then
-			if [[ -n "$element" && " ${gumSelectedArray[*]} " == *" $element "* ]]; then
-				commonPrintf "skipping \"$element\""
-			else
-				commonPrintfBold "entering \"$element\" phase"
-				[[ "$WMS_EXEC_DRY" == false ]] && $fn
-			fi
+for i in $(seq 0 $((${#fnDescs[@]} - 1))); do
+	found=false
+	for skip in "${gumUnselected[@]}"; do
+		if [ "$skip" = "${fnDescs[i]}" ]; then
+			found=true
 			break
 		fi
 	done
+
+	if [ "$found" = true ]; then
+		commonPrintf "\"${fnDescs[i]}\" phase will be skipped"
+	else
+		commonPrintf "entering \"${fnDescs[i]}\" phase"
+		${fnNames[i]}
+		commonVerify $? "${fnNames[i]} is failed" "${fnNames[i]} is succeeded" 
+	fi
 done
 
 # endregion: exec
